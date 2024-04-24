@@ -1,0 +1,227 @@
+﻿<!DOCTYPE html>
+<html>
+<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+<body>
+<div>частота несущего колебания (должна быть больше нуля)
+    <input id='fc' type="number" min="1" max="1000" value="10" /> Гц
+</div>
+<div>частота информационного сигнала (должна быть больше нуля)
+    <input id='fm' type="number" min="1" max="1000" value="1" /> Гц
+</div>
+<div>амплитуда несущего колебания (должна быть больше нуля)
+    <input id='Ac' type="number" min="1" max="1000" value="3" /> ед
+</div>
+<div>амплитуда информационного сигнала (должна быть больше нуля)
+    <input id='Am' type="number" min="1" max="1000" value="2" /> ед
+</div>
+<div>некорректно введенные значения при построении будут заменены значениями по умолчанию</div>
+
+<button id='draw1' onclick='draw()'>Построить график</button>
+<div id="myPlot" style="height:100%;"></div>
+<div id="myPlot2" style="height:100%;"></div>
+
+<script>
+    function CarrierWave(fc, Ac, t)
+    {
+        let y = Ac * Math.sin(2 * Math.PI * fc * t);
+        return y;
+    }
+    
+    function MessageSignal(fm, Am, t)
+    {
+        let y = Am * Math.cos(2 * Math.PI * fm * t);
+        return y;
+    }
+
+    function ModulatedSignal(fc, fm, Ac, Am, t)
+    {
+        let y = Ac * Math.sin(2 * Math.PI * fc * t) + 0.5 * Am * (Math.sin(2 * Math.PI * (fc + fm) * t) + Math.sin(2 * Math.PI * (fc - fm) * t));
+        return y;
+    }
+
+    // возвращает список координат для построения графика
+    function getCoords(h, n, fc, fm, Ac, Am)
+    {
+        let coords = [[], [], [], []]; // [[t1, ... t_cnt], [c1, ... c_cnt], [m_1, ... m_cnt], [y_1, .. y_cnt]] ci - CarrierWave mi - MessageSignal, yi - ModulatedSignal 
+
+        for (let i = 0; i < n; i++)
+        {
+            let t = i * h;
+            coords[0].push(t);
+            coords[1].push(CarrierWave(fc, Ac, t));
+            coords[2].push(MessageSignal(fm, Am, t));
+            coords[3].push(ModulatedSignal(fc, fm, Ac, Am, t));
+        }
+
+        return coords;
+    }
+
+    function draw() {
+        let n = 5000;
+        let fc = parseFloat(document.getElementById("fc").value);
+        let fm = parseFloat(document.getElementById("fm").value);
+        let Ac = parseFloat(document.getElementById("Ac").value);
+        let Am = parseFloat(document.getElementById("Am").value);
+        if (fc <= 0) {
+            fc = 10;
+            document.getElementById("fc").value = 10;
+        }
+        if (fm <= 0) {
+            fm = 1;
+            document.getElementById("fm").value = 1;
+        }
+        if (Ac <= 0) {
+            Ac = 3;
+            document.getElementById("Ac").value = 3;
+        }
+        if (Am <= 0) {
+            Am = 2;
+            document.getElementById("Am").value = 2;
+        }
+        let h = 0.001; // step
+
+        let data = getCoords(h, n, fc, fm, Ac, Am);
+        
+        // Define Data
+        const c_data = {
+            x: data[0],
+            y: data[1],
+            mode: "lines",
+            type: "scatter",
+            name: "Несущее колебание"
+        };
+
+        const m_data = {
+            x: data[0],
+            y: data[2],
+            mode: "lines",
+            type: "scatter",
+            name: "Информационный сигнал",
+            xaxis: "x2",
+            yaxis: "y2"
+        };
+
+        const y_data = {
+            x: data[0],
+            y: data[3],
+            mode: "lines",
+            type: "scatter",
+            name: "Результат модуляции",
+            xaxis: "x3",
+            yaxis: "y3"
+        };
+        
+        const c_spectrum = {
+            x: [2 * Math.PI * fc, 2 * Math.PI * fc],
+            y: [0, Ac],
+            mode: "lines",
+            type: "scatter",
+            name: "спектр несущего колебания",
+        };
+
+        const m_spectrum = {
+            x: [2 * Math.PI * fm, 2 * Math.PI * fm],
+            y: [0, Am],
+            mode: "lines",
+            type: "scatter",
+            line: {color: 'orange'},
+            name: "спектр информационного сигнала",
+        };
+        
+        const y_spectrum_segment1 = {
+            x: [2 * Math.PI * fc, 2 * Math.PI * fc],
+            y: [0, Ac],
+            mode: "lines",
+            type: "scatter",
+            legendgroup: 'group',
+            line: {color: 'green'},
+            name: "спектр результата модуляции",
+        }
+
+        const y_spectrum_segment2 = {
+            x: [2 * Math.PI * (fc + fm), 2 * Math.PI * (fc + fm)],
+            y: [0, 0.5 * Am],
+            mode: "lines",
+            type: "scatter",
+            legendgroup: 'group',
+            name: "спектр результата модуляции",
+            line: {color: 'green'},
+            showlegend: false,
+        }
+
+        const y_spectrum_segment3 = {
+            x: [2 * Math.PI * (fc - fm), 2 * Math.PI * (fc - fm)],
+            y: [0, 0.5 * Am],
+            mode: "lines",
+            type: "scatter",
+            legendgroup: 'group',
+            showlegend: false,
+            line: {color: 'green'},
+            name: "спектр результата модуляции",
+        }
+
+        // Define Layout
+        const layout = {
+            grid: {rows: 3, columns: 1, pattern: 'independent'},
+            title: "Моделирование амплитудной модуляции сигнала",
+            xaxis: {
+                exponentformat: 'e'
+            },
+            yaxis: {
+                title: {
+                    text: "c(t), ед"
+                },
+                exponentformat: 'e'
+            },
+            xaxis2: {
+                exponentformat: 'e'
+            },
+            yaxis2: {
+                title: {
+                    text: "m(t), ед"
+                },
+                exponentformat: 'e'
+            },
+            xaxis3: {
+                title: {
+                    text: "t, c"
+                },
+                exponentformat: 'e'
+            },
+            yaxis3: {
+                title: {
+                    text: "y(t), ед"
+                },
+                exponentformat: 'e'
+            }
+        };
+
+        const layout2 = {
+            title: "Спектры всех сигналов",
+            xaxis: {
+                exponentformat: 'e',
+                range: [0, 2 * Math.PI * (fc + fm) + 1],
+                title: {
+                    text: "циклическая частота, рад/с"
+                },
+            },
+            yaxis: {
+                title: {
+                    text: "амплитуда, ед"
+                },
+                exponentformat: 'e'
+            }
+        };
+
+        // Display using Plotly
+        Plotly.newPlot("myPlot", [c_data, m_data, y_data], layout);
+        Plotly.newPlot("myPlot2", [c_spectrum, m_spectrum, y_spectrum_segment1, y_spectrum_segment2, y_spectrum_segment3], layout2);
+    }
+
+    draw();
+    document.getElementById('draw1').onclick = draw; // draw by button click
+
+</script>
+
+</body>
+</html>
